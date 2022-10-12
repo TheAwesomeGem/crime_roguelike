@@ -4,6 +4,8 @@
 #include <vector>
 #include <uuid.h>
 #include <unordered_set>
+#include <memory>
+#include <deque>
 #include "Delegates.h"
 
 
@@ -36,7 +38,7 @@ using EntityId = uuids::uuid;
 using ComponentId = uuids::uuid;
 
 struct Point {
-    Point(int X_, int Y_, int Z_) : X{X_}, Y{Y_}, Z{Z_} {
+    Point(int32_t X_, int32_t Y_, int32_t Z_) : X{X_}, Y{Y_}, Z{Z_} {
 
     }
 
@@ -48,9 +50,9 @@ struct Point {
         return this->X == Other.X && this->Y == Other.Y && this->Z == Other.Z;
     }
 
-    int X;
-    int Y;
-    int Z;
+    int32_t X;
+    int32_t Y;
+    int32_t Z;
 };
 
 struct Vec3 {
@@ -158,23 +160,74 @@ namespace std {
     };
 }
 
-struct Zone {
-    static constexpr const float Size = 500.0F; // The Area Size of a Zone in Meters. Needed for the Movement between Zones
+enum class ZoneComponentType {
+    Police
+};
 
-    explicit Zone(Point ZoneCoordinate)
-            : Coordinate{ZoneCoordinate}, Entities{} {
+struct ZoneComponent {
+    explicit ZoneComponent(ZoneComponentType ComponentType)
+            : Type{ComponentType} {
 
     }
 
+    ZoneComponentType Type;
+};
+
+
+using ZoneComponentTypeMap = std::unordered_map<ZoneComponentType, std::unique_ptr<ZoneComponent>>;
+
+struct Zone {
+    static constexpr const uint8_t TURNS_TO_REGENERATE = 4;
+
+    explicit Zone(Point ZoneCoordinate)
+            : Coordinate{ZoneCoordinate}, TurnsSinceLastCreated{-1}, NPCEntities{}, Components{} {
+
+    }
+
+    template<typename T>
+    void AddComponent(ZoneComponent* ComponentToAdd) {
+        if (Components.find(ComponentToAdd->Type) != Components.end()) {
+            printf("Component already exists.\n");
+            return;
+        }
+
+        Components.emplace(ComponentToAdd->Type, std::unique_ptr<ZoneComponent>{ComponentToAdd});
+    }
+
+    template<typename T>
+    void RemoveComponent(ZoneComponentType ComponentTypeToRemove) {
+        if (Components.find(ComponentTypeToRemove) == Components.end()) {
+            printf("Component does not exists already.\n");
+            return;
+        }
+
+        Components.erase(ComponentTypeToRemove);
+    }
+
+    template<typename T>
+    T* GetComponent(ZoneComponentType Type) {
+        auto ComponentIt = Components.find(Type);
+
+        if (ComponentIt == Components.end()) {
+            return nullptr;
+        }
+
+        return dynamic_cast<T*>(ComponentIt->second.get());
+    }
+
     Point Coordinate; // Zone-Space Coordinate. For example Zone A (0, 0) and Zone B(1, 0)
-    std::unordered_set<EntityId> Entities; // All the entities in a specific Zone.
+    int16_t TurnsSinceLastCreated;
+    std::vector<EntityId> NPCEntities; // TODO: Should group them between civilian and police
+    // TODO: Removed Playable Entity Cache from Zone because there wouldn't be a lot of Playable Entities anyway. Maybe need to revisit later?
+
+private:
+    ZoneComponentTypeMap Components; // All the components that extend the state of the Zone.
 };
 
 using ZonePointMap = std::unordered_map<Point, Zone>;
 
 enum class ComponentType {
-    Health,
-    Movement
+    Health
 };
 
 struct BaseComponent {
@@ -239,21 +292,12 @@ private:
     float MaxHealth;
 };
 
-struct MovementComponent : BaseComponent {
-    explicit MovementComponent(ComponentId Identifier)
-            : BaseComponent{Identifier, ComponentType::Movement}, NewLocation{} {
-
-    }
-
-    Vec3 NewLocation;
-};
-
 using ComponentIdMap = std::unordered_map<ComponentId, BaseComponent*>;
 using ComponentTypeMap = std::unordered_map<ComponentType, BaseComponent*>;
 
 struct Entity {
     explicit Entity(EntityId Identifier)
-            : Id{Identifier}, Components{}, ZoneCoordinate{}, Location{} {
+            : Id{Identifier}, Components{}, ZoneCoordinate{} {
 
     }
 
@@ -271,8 +315,7 @@ struct Entity {
 public:
     EntityId Id;
     ComponentTypeMap Components;
-    Point ZoneCoordinate; // Which Zone they are in.
-    Vec3 Location; // TODO: Location within a Zone space. Move to a Transform Component?
+    Point ZoneCoordinate;
 };
 
 class ComponentStorage {
@@ -343,6 +386,16 @@ public:
         return false;
     }
 
+    Entity* GetEntityFromId(EntityId IdToGet) {
+        auto EntityIt = Entities.find(IdToGet);
+
+        if (EntityIt == Entities.end()) {
+            return nullptr;
+        }
+
+        return &EntityIt->second;
+    }
+
     EntityIdMap& GetEntities() {
         return Entities;
     }
@@ -370,136 +423,6 @@ namespace ZoneManager {
 
         return &ZoneIt->second;
     }
-
-    static bool AddEntityToZone(ZonePointMap& Zones, Entity* EntityToAdd, Point ZoneCoordinateToAdd) {
-        if (EntityToAdd == nullptr) {
-            printf("Invalid entity to add to zone.\n");
-            return false;
-        }
-
-        Zone* ZoneToAdd = GetZoneFromCoord(Zones, ZoneCoordinateToAdd);
-
-        if (ZoneToAdd == nullptr) {
-            printf("Could not find the Zone to spawn in.\n");
-            return false;
-        }
-
-        ZoneToAdd->Entities.emplace(EntityToAdd->Id);
-        EntityToAdd->ZoneCoordinate = ZoneToAdd->Coordinate;
-
-        return true;
-    }
-
-    static bool RemoveEntityFromZone(ZonePointMap& Zones, Entity* EntityToRemove) {
-        if (EntityToRemove == nullptr) {
-            printf("Invalid entity to remove from the zone.\n");
-            return false;
-        }
-
-        Zone* ZoneToRemove = GetZoneFromCoord(Zones, EntityToRemove->ZoneCoordinate);
-
-        if (ZoneToRemove == nullptr) {
-            printf("Very bad bug man. Every Entities needs a zone.\n");
-            // TODO: Change this to assert.
-            return false;
-        }
-
-        ZoneToRemove->Entities.erase(EntityToRemove->Id);
-        EntityToRemove->ZoneCoordinate = Point{};
-
-        return true;
-    }
-
-    static bool UpdateEntityZone(ZonePointMap& Zones, Entity* EntityToUpdate) {
-        if (EntityToUpdate == nullptr) {
-            printf("Invalid entity to update the zone.\n");
-            return false;
-        }
-
-        Point NewZoneCoord = EntityToUpdate->ZoneCoordinate;
-        Vec3 CurrentLocation = EntityToUpdate->Location;
-        Vec3 NewLocation = CurrentLocation;
-
-        if (CurrentLocation.X > Zone::Size) {
-            NewLocation.X = CurrentLocation.X - Zone::Size;
-            ++NewZoneCoord.X;
-        } else if (CurrentLocation.X < -Zone::Size) {
-            NewLocation.X = Zone::Size - (std::abs(CurrentLocation.X) - Zone::Size);
-            --NewZoneCoord.X;
-        } else if (CurrentLocation.Y > Zone::Size) {
-            NewLocation.Y = CurrentLocation.Y - Zone::Size;
-            ++NewZoneCoord.Y;
-        } else if (CurrentLocation.Y < -Zone::Size) {
-            NewLocation.Y = Zone::Size - (std::abs(CurrentLocation.Y) - Zone::Size);
-            --NewZoneCoord.Y;
-        }
-
-        EntityToUpdate->Location = NewLocation;
-
-        if (NewZoneCoord != EntityToUpdate->ZoneCoordinate) {
-            RemoveEntityFromZone(Zones, EntityToUpdate);
-            AddEntityToZone(Zones, EntityToUpdate, NewZoneCoord);
-        }
-
-        return true;
-    }
-}
-
-namespace MovementInput {
-    static void MoveForward(Entity* EntityToMove, float Value) {
-        MovementComponent* Movement = EntityToMove->GetComponent<MovementComponent>(ComponentType::Movement);
-
-        if (!Movement) {
-            printf("Bruh!\n");
-            return;
-        }
-
-        Movement->NewLocation.Y = Value;
-    }
-
-    static void MoveRight(Entity* EntityToMove, float Value) {
-        MovementComponent* Movement = EntityToMove->GetComponent<MovementComponent>(ComponentType::Movement);
-
-        if (!Movement) {
-            printf("Bruh!\n");
-            return;
-        }
-
-        Movement->NewLocation.X = Value;
-    }
-
-    static void MoveUp(Entity* EntityToMove, float Value) {
-        MovementComponent* Movement = EntityToMove->GetComponent<MovementComponent>(ComponentType::Movement);
-
-        if (!Movement) {
-            printf("Bruh!\n");
-            return;
-        }
-
-        Movement->NewLocation.Z = Value;
-    }
-}
-
-namespace EntityUpdateManager {
-    static void DoEntityMovement(Entity* EntityToMove, ZonePointMap& Zones) {
-        MovementComponent* Movement = EntityToMove->GetComponent<MovementComponent>(ComponentType::Movement);
-
-        if (!Movement) {
-            return;
-        }
-
-        // TODO: Move this to physics system
-        EntityToMove->Location += Movement->NewLocation;
-        Movement->NewLocation = Vec3{};
-        ZoneManager::UpdateEntityZone(Zones, EntityToMove);
-    }
-
-    static void UpdateZone(Zone* ZoneToUpdate, ZonePointMap& Zones, EntityIdMap& Entities) {
-        auto EntitiesSnapshot = ZoneToUpdate->Entities;
-        for (EntityId EntityInZoneId: EntitiesSnapshot) {
-            DoEntityMovement(&Entities.at(EntityInZoneId), Zones);
-        }
-    }
 }
 
 class World {
@@ -516,14 +439,17 @@ public:
 
     Entity* SpawnEntity(Point ZoneCoordinate) {
         Entity* SpawnedEntity = Entities.Create(UuidRng());
-        ZoneManager::AddEntityToZone(Zones, SpawnedEntity, ZoneCoordinate);
+        SpawnedEntity->ZoneCoordinate = ZoneCoordinate;
 
         return SpawnedEntity;
     }
 
     void DestroyEntity(Entity* EntityToDestroy) {
-        ZoneManager::RemoveEntityFromZone(Zones, EntityToDestroy);
         Entities.Destroy(EntityToDestroy->Id);
+    }
+
+    Entity* GetEntity(EntityId IdToGet) {
+        return Entities.GetEntityFromId(IdToGet);
     }
 
     template<typename T>
@@ -532,10 +458,6 @@ public:
         EntityStorage::AttachComponent(EntityToAttachTo, NewComponent);
 
         return NewComponent;
-    }
-
-    void Update(Point ZoneToUpdateCoord) {
-        EntityUpdateManager::UpdateZone(ZoneManager::GetZoneFromCoord(Zones, ZoneToUpdateCoord), Zones, Entities.GetEntities());
     }
 
 public:
@@ -560,6 +482,112 @@ private:
     uuids::uuid_random_generator UuidRng;
 };
 
+struct Command {
+    explicit Command(World* World) : CurrentWorld{World} {
+
+    }
+
+    virtual ~Command() = default;
+
+    virtual void Execute() = 0;
+
+private:
+    World* CurrentWorld;
+};
+
+class Controller {
+public:
+    Controller() : MainControlledEntity{nullptr}, ControlledEntities{} {
+
+    }
+
+    void Possess(Entity* MainEntity) {
+        ControlledEntities.push_back(MainEntity->Id);
+        MainControlledEntity = MainEntity;
+    }
+
+    void AddCommand(Command* CommandToAdd) {
+        Commands.push_back(std::unique_ptr<Command>{CommandToAdd});
+    }
+
+    Command* GetCommand() const {
+        return Commands.front().get();
+    }
+
+    void PopCommand() {
+        Commands.pop_front();
+    }
+
+    bool HasCommands() const {
+        return !Commands.empty();
+    }
+
+private:
+    Entity* MainControlledEntity; // TODO: Perhaps this should be an ID instead of a Pointer? But then again, game is over for AI/Player after they lose the ControlledEntity anyway.
+    std::deque<std::unique_ptr<Command>> Commands;
+
+public:
+    std::vector<EntityId> ControlledEntities;
+};
+
+struct EventData {
+    EventData()
+            : ZoneCoordinate{}, Instigator{nullptr}, Target{nullptr} {
+
+    }
+
+    Point ZoneCoordinate;
+    // EventType Type;
+    Entity* Instigator;
+    Entity* Target;
+};
+
+struct History {
+    std::vector<EventData> Events;
+};
+
+namespace CommandProcessor {
+    static void ProcessCommand(Controller* Controller) {
+        while (Controller->HasCommands()) {
+            Controller->GetCommand()->Execute();
+            Controller->PopCommand();
+        }
+    }
+}
+
+namespace ZoneUpdate {
+    static void UpdateZone(World* CurrentWorld, Point ZoneCoordinate) {
+        Zone* ZoneToUpdate = ZoneManager::GetZoneFromCoord(CurrentWorld->Zones, ZoneCoordinate);
+
+        if (ZoneToUpdate == nullptr) {
+            printf("HUGE PROBLEM HERE FOLKS!\n");
+
+            return;
+        }
+
+        if (ZoneToUpdate->TurnsSinceLastCreated == -1 || ZoneToUpdate->TurnsSinceLastCreated >= Zone::TURNS_TO_REGENERATE) {
+            // TODO: Regenerate zone.
+        }
+
+        // TODO: Updates each component that needs to be updated and use the NPC entities to generate commands against the playable entities.
+    }
+}
+
+namespace UpdateManager {
+    static void Update(World* CurrentWorld, Controller* Controller) {
+        CommandProcessor::ProcessCommand(Controller);
+
+        for (EntityId ControlledEntityId: Controller->ControlledEntities) {
+            Entity* ControlledEntity = CurrentWorld->GetEntity(ControlledEntityId);
+            if (ControlledEntity == nullptr) {
+                continue;
+            }
+
+            ZoneUpdate::UpdateZone(CurrentWorld, ControlledEntity->ZoneCoordinate);
+        }
+    }
+}
+
 std::ostream& operator<<(std::ostream& stream, Vec3 Location) {
     stream << "[" << Location.X << ", " << Location.Y << "]";
 
@@ -574,8 +602,23 @@ std::ostream& operator<<(std::ostream& stream, Point Coordinate) {
 
 int main() {
     World CurrentWorld;
-    Entity* MainCharacter = CurrentWorld.SpawnEntity(Point{0, 0, 0});
-    MovementComponent* Movement = CurrentWorld.CreateComponent<MovementComponent>(MainCharacter);
+    Controller PlayerController{};
+    PlayerController.Possess(CurrentWorld.SpawnEntity(Point{0, 0, 0}));
+
+
+    // TODO: Add turn system and for now, it will be only Player. Add all the commands a Player makes before they finish the turn and process it in an update loop to
+    // TODO: generate states for the next turn. Rinse and repeat.
+
+    // TODO: Maybe instead of using events, anytime an entity moves to a zone, we generate state to that zone. For example, we will generate other entities randomly.
+    // TODO: Whenever an entity leaves the zone, the state gets cleared. We will need a distinction between player/AI controlled entities and generated NPC entities.
+    // TODO: NPC entities should not be allowed to travel between zones and they are stuck on the zone they are generated in and gets destroyed once playable entity leaves the zone.
+    // TODO: Now after the temporary state of a zone gets generated, player can assign commands to the playable entity based on the state of the zone.
+    // TODO: There will be permanent state of the zone and that can be stored inside a component. Things such as police population and civilian population and the type of zone.
+
+    // TODO: ControlledEntities = Playable Entities
+    // TODO: !ControlledEntities = NPC Entities
+
+    UpdateManager::Update(&CurrentWorld, &PlayerController); // Initial Update to Regenerate all the zones that a Playable Entity is at.
 
     std::string Input;
     do {
@@ -590,33 +633,14 @@ int main() {
                        [](unsigned char c) { return std::tolower(c); });
 
         if (Input == "forward" || Input == "back" || Input == "left" || Input == "right") {
-            float Speed = 350.0F;
-
-            if (Input == "forward") {
-                MovementInput::MoveForward(MainCharacter, Speed);
-                std::cout << "You walked forward.\n";
-            } else if (Input == "back") {
-                MovementInput::MoveForward(MainCharacter, -Speed);
-                std::cout << "You walked back.\n";
-            } else if (Input == "left") {
-                MovementInput::MoveRight(MainCharacter, -Speed);
-                std::cout << "You walked left.\n";
-            } else if (Input == "right") {
-                MovementInput::MoveRight(MainCharacter, Speed);
-                std::cout << "You walked right.\n";
-            } else if (Input == "up") {
-                MovementInput::MoveUp(MainCharacter, Speed);
-                std::cout << "You walked up.\n";
-            } else if (Input == "down") {
-                MovementInput::MoveUp(MainCharacter, -Speed);
-                std::cout << "You walked down.\n";
-            }
+            // TODO: Add commands to player controller here.
         }
 
-        CurrentWorld.Update(MainCharacter->ZoneCoordinate);
+        if (Input == "end") {
+            // TODO: Player has ended the turn, let TurnManager dictate who takes their turn next.
+        }
 
-        std::cout << "Player Location is " << MainCharacter->Location << '\n';
-        std::cout << "Player Zone is " << MainCharacter->ZoneCoordinate << '\n';
+        UpdateManager::Update(&CurrentWorld, &PlayerController); // TODO: This will be a list of Controllers after adding AI.
     }
 
     while (!Input.empty());
