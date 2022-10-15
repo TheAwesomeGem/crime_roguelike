@@ -566,10 +566,10 @@ namespace ZoneUpdate {
         }
 
         if (ZoneToUpdate->TurnsSinceLastCreated == -1 || ZoneToUpdate->TurnsSinceLastCreated >= Zone::TURNS_TO_REGENERATE) {
-            // TODO: Regenerate zone.
+            // TODO: Regenerate zone along with each entity and it's AIController.
         }
 
-        // TODO: Updates each component that needs to be updated and use the NPC entities to generate commands against the playable entities.
+        // TODO: Updates each component that needs to be updated
     }
 }
 
@@ -598,6 +598,12 @@ std::ostream& operator<<(std::ostream& stream, Point Coordinate) {
     stream << "(" << Coordinate.X << ", " << Coordinate.Y << ")";
 
     return stream;
+}
+
+namespace MovementInput {
+    static void DoMovement(Controller* InputController, std::string_view Input, World* CurrentWorld) {
+        InputController->AddCommand();
+    }
 }
 
 int main() {
@@ -634,16 +640,20 @@ int main() {
 
         if (Input == "forward" || Input == "back" || Input == "left" || Input == "right") {
             // TODO: Add commands to player controller here.
-        }
-
-        if (Input == "end") {
+            MovementInput::DoMovement(&PlayerController, Input, &CurrentWorld);
+        } else if (Input == "end") {
+            break;
             // TODO: Player has ended the turn, let TurnManager dictate who takes their turn next.
+        } else {
+            printf("Unknown Command.\n");
         }
-
-        UpdateManager::Update(&CurrentWorld, &PlayerController); // TODO: This will be a list of Controllers after adding AI.
     }
 
     while (!Input.empty());
+
+    // TODO: LOOP THROUGH EACH AI CONTROLLER HERE AND GENERATE COMMANDS
+
+    UpdateManager::Update(&CurrentWorld, &PlayerController); // TODO: This will be a list of Controllers after adding AI.
 
     return 0;
 }
