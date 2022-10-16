@@ -6,24 +6,28 @@
 
 
 struct Command {
-    explicit Command(World* World, EntityId Id);
+    explicit Command(World* World, Entity* Entity);
 
     virtual ~Command() = default;
 
     virtual void Execute() = 0;
 
-    Entity* GetEntity() {
-        return CurrentWorld->GetEntity(CurrentEntityId);
+    Zone* GetEntityZone() {
+        return CurrentWorld->GetZone(CurrentEntity->GetCoord());
+    }
+
+    Zone* GetOldEntityZone() {
+        return CurrentWorld->GetZone(CurrentEntity->GetOldCoord());
     }
 
     World* CurrentWorld;
 
-private:
-    EntityId CurrentEntityId;
+protected:
+    Entity* CurrentEntity;
 };
 
 struct MovementCommand : Command {
-    explicit MovementCommand(World* World, EntityId Id, Point Coordinate);
+    explicit MovementCommand(World* World, Entity* Entity, Point Coordinate);
 
     virtual void Execute() override;
 

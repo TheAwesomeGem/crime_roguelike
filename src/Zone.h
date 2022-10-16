@@ -17,7 +17,7 @@ struct ZoneComponent {
 };
 
 struct Zone {
-    static constexpr const uint8_t TURNS_TO_REGENERATE = 4;
+    static inline const Point InvalidZoneCoord{-1, -1, -1};
 
     explicit Zone(Point ZoneCoordinate);
 
@@ -52,10 +52,17 @@ struct Zone {
         return dynamic_cast<T*>(ComponentIt->second.get());
     }
 
+    bool IsGenerated() const {
+        return !NPCEntities.empty();
+    }
+
+    bool ShouldDestroy() const {
+        return PlayableEntitiesCache.empty();
+    }
+
     Point Coordinate; // Zone-Space Coordinate. For example Zone A (0, 0) and Zone B(1, 0)
-    int16_t TurnsSinceLastCreated;
     std::vector<EntityId> NPCEntities; // TODO: Should group them between civilian and police
-    // TODO: Removed Playable Entity Cache from Zone because there wouldn't be a lot of Playable Entities anyway. Maybe need to revisit later?
+    std::unordered_set<EntityId> PlayableEntitiesCache;
 
 private:
     std::unordered_map<ZoneComponentType, std::unique_ptr<ZoneComponent>> Components; // All the components that extend the state of the Zone.

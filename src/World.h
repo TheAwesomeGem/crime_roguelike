@@ -19,7 +19,7 @@ public:
 public:
     explicit World();
 
-    Entity* SpawnEntity(Point ZoneCoordinate);
+    Entity* SpawnEntity();
 
     void DestroyEntity(Entity* EntityToDestroy);
 
@@ -32,6 +32,8 @@ public:
 
         return NewComponent;
     }
+
+    Zone* GetZone(Point ZoneCoord);
 
 public:
     ComponentStorage Components;

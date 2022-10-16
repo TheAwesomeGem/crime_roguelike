@@ -25,6 +25,12 @@ struct GameState {
 
     Controller* GetPlayerController();
 
+    std::pair<Controller*, Entity*> CreateEntityWithController(Point ZoneCoordinate);
+
+    std::unordered_map<ControllerId, Controller>& GetAllControllers() {
+        return Controllers;
+    }
+
 private:
     std::unordered_map<ControllerId, Controller> Controllers;
     ControllerId PlayerControllerId;

@@ -28,5 +28,5 @@ public:
     EntityId ControlledEntityId;
 
 private:
-    std::deque<std::unique_ptr<Command>> Commands;
+    std::deque<std::unique_ptr<Command>> Commands; // TODO: Add restriction to the Commands you can queue. For example 1 per entity.
 };

@@ -1,4 +1,5 @@
 #include "World.h"
+#include "ZoneManager.h"
 
 
 World::World()
@@ -6,9 +7,8 @@ World::World()
     GenerateEmptyZones();
 }
 
-Entity* World::SpawnEntity(Point ZoneCoordinate) {
+Entity* World::SpawnEntity() {
     Entity* SpawnedEntity = Entities.Create(Random::Uuid());
-    SpawnedEntity->ZoneCoordinate = ZoneCoordinate;
 
     return SpawnedEntity;
 }
@@ -17,11 +17,15 @@ void World::DestroyEntity(Entity* EntityToDestroy) {
     ControllerId ControlledById = EntityToDestroy->ControlledBy;
     Entities.Destroy(EntityToDestroy->Id);
 
-    EntityDestroyEvent.Broadcast(EntityToDestroy, ControlledById);
+    EntityDestroyEvent.Broadcast(EntityToDestroy, ControlledById); // TODO: Figure out if we really need this
 }
 
 Entity* World::GetEntity(EntityId IdToGet) {
     return Entities.GetEntityFromId(IdToGet);
+}
+
+Zone* World::GetZone(Point ZoneCoord) {
+    return ZoneManager::GetZoneFromCoord(this, ZoneCoord);
 }
 
 void World::GenerateEmptyZones() {

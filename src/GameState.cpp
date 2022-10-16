@@ -58,3 +58,12 @@ Controller* GameState::GetPlayerController() {
 
     return GetController(PlayerControllerId);
 }
+
+std::pair<Controller*, Entity*> GameState::CreateEntityWithController(Point ZoneCoordinate) {
+    Controller* NewController = CreateController();
+    Entity* SpawnedEntity = CurrentWorld.SpawnEntity();
+    NewController->Possess(SpawnedEntity);
+    SpawnedEntity->SetCoord(ZoneCoordinate);
+
+    return std::make_pair(NewController, SpawnedEntity);
+}

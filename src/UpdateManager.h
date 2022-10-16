@@ -1,12 +1,9 @@
 #pragma once
 
 #include "Common.h"
-#include "World.h"
-#include "Controller.h"
+#include "GameState.h"
 
 
 namespace UpdateManager {
-    void UpdateZone(World* CurrentWorld, Point ZoneCoordinate);
-
-    void Update(World* CurrentWorld, Controller* Controller);
+    void Update(GameState* Game);
 }

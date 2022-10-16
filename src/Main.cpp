@@ -4,6 +4,9 @@
 #include "UpdateManager.h"
 
 
+// TODO: Main:
+// TODO: Add basic commands and restriction for 1 command per entity
+
 struct EventData {
     EventData()
             : ZoneCoordinate{}, Instigator{nullptr}, Target{nullptr} {
@@ -35,30 +38,22 @@ std::ostream& operator<<(std::ostream& stream, Point Coordinate) {
 
 namespace MovementInput {
     static void DoMovement(Controller* InputController, std::string_view Input, World* CurrentWorld) {
-        InputController->AddCommand(std::make_unique<MovementCommand>(CurrentWorld, InputController->ControlledEntityId, Point{1, 0, 0}));
+        InputController->AddCommand(
+                std::make_unique<MovementCommand>(
+                        CurrentWorld,
+                        CurrentWorld->GetEntity(InputController->ControlledEntityId),
+                        Point{1, 0, 0})
+        );
     }
 }
 
 int main() {
     GameState Game;
-    Controller* PlayerController = Game.CreateController();
-    Entity* PlayerEntity = Game.CurrentWorld.SpawnEntity(Point{0, 0, 0});
-    PlayerController->Possess(PlayerEntity);
+    auto [PlayerController, _] = Game.CreateEntityWithController(Point{0, 0, 0});
 
-
-    // TODO: Add turn system and for now, it will be only Player. Add all the commands a Player makes before they finish the turn and process it in an update loop to
-    // TODO: generate states for the next turn. Rinse and repeat.
-
-    // TODO: Maybe instead of using events, anytime an entity moves to a zone, we generate state to that zone. For example, we will generate other entities randomly.
-    // TODO: Whenever an entity leaves the zone, the state gets cleared. We will need a distinction between player/AI controlled entities and generated NPC entities.
-    // TODO: NPC entities should not be allowed to travel between zones and they are stuck on the zone they are generated in and gets destroyed once playable entity leaves the zone.
-    // TODO: Now after the temporary state of a zone gets generated, player can assign commands to the playable entity based on the state of the zone.
     // TODO: There will be permanent state of the zone and that can be stored inside a component. Things such as police population and civilian population and the type of zone.
 
-    // TODO: ControlledEntities = Playable Entities
-    // TODO: !ControlledEntities = NPC Entities
-
-    UpdateManager::Update(&Game.CurrentWorld, PlayerController); // Initial Update to Regenerate all the zones that a Playable Entity is at.
+    UpdateManager::Update(&Game); // Initial Update to Regenerate all the zones that a Playable Entity is at.
 
     std::string Input;
     do {
@@ -75,18 +70,15 @@ int main() {
         if (Input == "forward" || Input == "back" || Input == "left" || Input == "right") {
             MovementInput::DoMovement(PlayerController, Input, &Game.CurrentWorld);
         } else if (Input == "end") {
-            break;
+            // TODO: Add AI Commands now to simulate AI's turn.
             // TODO: Player has ended the turn, let TurnManager dictate who takes their turn next.
+            UpdateManager::Update(&Game);
         } else {
             printf("Unknown Command.\n");
         }
     }
 
     while (!Input.empty());
-
-    // TODO: LOOP THROUGH EACH AI CONTROLLER HERE AND GENERATE COMMANDS
-
-    UpdateManager::Update(&Game.CurrentWorld, PlayerController); // TODO: This will be a list of Controllers after adding AI.
 
     return 0;
 }

@@ -18,9 +18,24 @@ struct Entity {
         return dynamic_cast<T*>(ComponentIt->second);
     }
 
+    void SetCoord(Point NewZoneCoordinate);
+
+    void SetCoordCurrent();
+
+    Point GetCoord() const {
+        return ZoneCoordinate;
+    }
+
+    Point GetOldCoord() const {
+        return OldZoneCoordinate;
+    }
+
 public:
     EntityId Id;
     std::unordered_map<ComponentType, BaseComponent*> Components;
-    Point ZoneCoordinate;
     ControllerId ControlledBy;
+
+private:
+    Point ZoneCoordinate;
+    Point OldZoneCoordinate;
 };

@@ -2,6 +2,6 @@
 
 
 Zone::Zone(Point ZoneCoordinate)
-        : Coordinate{ZoneCoordinate}, TurnsSinceLastCreated{-1}, NPCEntities{}, Components{} {
+        : Coordinate{ZoneCoordinate}, NPCEntities{}, PlayableEntitiesCache{}, Components{} {
 
 }

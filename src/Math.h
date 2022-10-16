@@ -26,6 +26,34 @@ struct Point {
 
     }
 
+    Point operator*(float Scalar) const {
+        return Point{(int) (X * Scalar), (int) (Y * Scalar), (int) (Z * Scalar)};
+    }
+
+    Point operator/(float Scalar) const {
+        return *this * (1 / Scalar);
+    }
+
+    Point operator-() const {
+        return *this * -1.0F;
+    }
+
+    Point operator+(const Point& Other) const {
+        Point Coord{X + Other.X, Y + Other.Y, Z + Other.Z};
+
+        return Coord;
+    }
+
+    Point operator-(const Point& Other) const {
+        return *this + (-Other);
+    }
+
+    Point& operator+=(const Point& Other) {
+        *this = *this + Other;
+
+        return *this;
+    }
+
     bool operator==(const Point& Other) const {
         return this->X == Other.X && this->Y == Other.Y && this->Z == Other.Z;
     }
