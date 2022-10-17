@@ -11,7 +11,7 @@ public:
 
     void Possess(Entity* EntityToControl);
 
-    void AddCommand(std::unique_ptr<Command> CommandToAdd);
+    bool AddCommand(std::unique_ptr<Command> CommandToAdd);
 
     void PopCommand();
 
@@ -28,5 +28,5 @@ public:
     EntityId ControlledEntityId;
 
 private:
-    std::deque<std::unique_ptr<Command>> Commands; // TODO: Add restriction to the Commands you can queue. For example 1 per entity.
+    std::deque<std::unique_ptr<Command>> Commands;
 };

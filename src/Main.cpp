@@ -4,9 +4,6 @@
 #include "UpdateManager.h"
 
 
-// TODO: Main:
-// TODO: Add basic commands and restriction for 1 command per entity
-
 struct EventData {
     EventData()
             : ZoneCoordinate{}, Instigator{nullptr}, Target{nullptr} {
@@ -38,20 +35,21 @@ std::ostream& operator<<(std::ostream& stream, Point Coordinate) {
 
 namespace MovementInput {
     static void DoMovement(Controller* InputController, std::string_view Input, World* CurrentWorld) {
-        InputController->AddCommand(
+        Entity* EntityToMove = CurrentWorld->GetEntity(InputController->ControlledEntityId);
+        if (!InputController->AddCommand(
                 std::make_unique<MovementCommand>(
                         CurrentWorld,
-                        CurrentWorld->GetEntity(InputController->ControlledEntityId),
+                        EntityToMove,
                         Point{1, 0, 0})
-        );
+        )) {
+            printf("Could not add command. Not enough turn amount left.\n");
+        }
     }
 }
 
 int main() {
     GameState Game;
     auto [PlayerController, _] = Game.CreateEntityWithController(Point{0, 0, 0});
-
-    // TODO: There will be permanent state of the zone and that can be stored inside a component. Things such as police population and civilian population and the type of zone.
 
     UpdateManager::Update(&Game); // Initial Update to Regenerate all the zones that a Playable Entity is at.
 

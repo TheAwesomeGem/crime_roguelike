@@ -3,7 +3,7 @@
 
 
 Entity::Entity(EntityId Identifier)
-        : Id{Identifier}, Components{}, ControlledBy{}, ZoneCoordinate{Zone::InvalidZoneCoord}, OldZoneCoordinate{ZoneCoordinate} {
+        : Id{Identifier}, Components{}, ControlledBy{}, ZoneCoordinate{Zone::InvalidZoneCoord}, OldZoneCoordinate{ZoneCoordinate}, TurnAmountLeft{MaxTurnAmount} {
 
 }
 

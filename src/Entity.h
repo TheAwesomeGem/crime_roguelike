@@ -5,6 +5,8 @@
 
 
 struct Entity {
+    static constexpr const int MaxTurnAmount = 3;
+
     explicit Entity(EntityId Identifier);
 
     template<typename T>
@@ -34,6 +36,7 @@ public:
     EntityId Id;
     std::unordered_map<ComponentType, BaseComponent*> Components;
     ControllerId ControlledBy;
+    int TurnAmountLeft;
 
 private:
     Point ZoneCoordinate;

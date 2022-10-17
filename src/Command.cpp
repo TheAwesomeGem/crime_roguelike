@@ -18,3 +18,7 @@ void MovementCommand::Execute() {
 
     printf("Executed Move Command to [%d,%d,%d]\n", ToCoordinate.X, ToCoordinate.Y, ToCoordinate.Z);
 }
+
+int MovementCommand::TurnAmount() {
+    return 3;
+}

@@ -10,10 +10,25 @@ void Controller::Possess(Entity* EntityToControl) {
     EntityToControl->ControlledBy = Id;
 }
 
-void Controller::AddCommand(std::unique_ptr<Command> CommandToAdd) {
+bool Controller::AddCommand(std::unique_ptr<Command> CommandToAdd) {
+    Entity* CommandEntity = CommandToAdd->CurrentEntity;
+    int TurnAmount = CommandToAdd->TurnAmount();
+
+    if (CommandEntity->TurnAmountLeft < TurnAmount) {
+        return false;
+    }
+
+    CommandEntity->TurnAmountLeft -= TurnAmount;
+
     Commands.push_back(std::move(CommandToAdd));
+
+    return true;
 }
 
 void Controller::PopCommand() {
+    Command* CommandToPop = Commands.front().get();
+    Entity* CommandEntity = CommandToPop->CurrentEntity;
+    CommandEntity->TurnAmountLeft += CommandToPop->TurnAmount();
+
     Commands.pop_front();
 }

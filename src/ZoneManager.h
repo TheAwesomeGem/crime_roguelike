@@ -5,6 +5,7 @@
 
 
 // TODO: Should this be an object inside World?
+// TODO: There will be permanent state of the zone and that can be stored inside a component. Things such as police population and civilian population and the type of zone.
 namespace ZoneManager {
     Zone* GetZoneFromCoord(World* World, Point ZoneCoordinate);
 
